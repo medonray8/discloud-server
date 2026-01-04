@@ -39,35 +39,52 @@ const commandQueue = new Map(); // clientId -> [comandos]
 const userSessions = new Map(); // username -> { clientId, token }
 
 // ============================================
-// CONFIGURAÇÕES GLOBAIS
+// CONFIGURAÇÕES POR USUÁRIO
 // ============================================
 
-const globalConfig = {
-    aimbot: {
-        enabled: false,
-        showfov: false,
-        fov: 60,
-        norcl: false
-    },
-    legitkeybind: {
-        enabled: false,
-        keybind: 0,
-        keybindmode: 0
-    },
-    ragekeybind: {
-        enabled: false,
-        keybind: 0,
-        keybindmode: 0
-    },
-    aim: {
-        controllegit: false,
-        controlrage: false
-    },
-    chams: {
-        enabled: false,
-        injected: false
+const userConfigs = new Map(); // username -> config
+
+function getDefaultConfig() {
+    return {
+        aimbot: {
+            enabled: false,
+            showfov: false,
+            fov: 60,
+            norcl: false
+        },
+        legitkeybind: {
+            enabled: false,
+            keybind: 0,
+            keybindmode: 0
+        },
+        ragekeybind: {
+            enabled: false,
+            keybind: 0,
+            keybindmode: 0
+        },
+        aim: {
+            controllegit: false,
+            controlrage: false
+        },
+        chams: {
+            enabled: false,
+            injected: false
+        },
+        closeProgram: false,
+        loadBypass: false
+    };
+}
+
+function getUserConfig(username) {
+    if (!username) return getDefaultConfig();
+    
+    if (!userConfigs.has(username)) {
+        userConfigs.set(username, getDefaultConfig());
+        console.log(`[Config] Criada configuração para usuário: ${username}`);
     }
-};
+    
+    return userConfigs.get(username);
+}
 
 // ============================================
 // WEBSOCKET SERVER (Comunicação em Tempo Real)
@@ -179,9 +196,13 @@ app.get('/api/status', (req, res) => {
 
 // Obter configuração atual
 app.get('/api/config', (req, res) => {
+    const username = req.query.username || req.headers['x-username'];
+    const userConfig = getUserConfig(username);
+    
     res.json({
         success: true,
-        config: globalConfig,
+        config: userConfig,
+        username: username,
         clients: Array.from(clients.values()).map(c => ({
             authenticated: c.authenticated,
             username: c.username,
@@ -195,25 +216,24 @@ app.get('/api/config', (req, res) => {
 // ============================================
 
 app.post('/api/aimbot', (req, res) => {
-    const { enabled, showfov, fov, norcl } = req.body;
-    console.log('[API] Aimbot config recebida:', req.body);
+    const { enabled, showfov, fov, norcl, username } = req.body;
+    const user = username || req.headers['x-username'];
     
-    if (enabled !== undefined) globalConfig.aimbot.enabled = enabled;
-    if (showfov !== undefined) globalConfig.aimbot.showfov = showfov;
-    if (fov !== undefined) globalConfig.aimbot.fov = fov;
-    if (norcl !== undefined) globalConfig.aimbot.norcl = norcl;
+    console.log(`[API] Aimbot config recebida para ${user}:`, req.body);
     
-    broadcastToAll({
-        type: 'config_update',
-        category: 'aimbot',
-        config: globalConfig.aimbot
-    });
+    const userConfig = getUserConfig(user);
     
-    console.log('[API] Aimbot atualizado:', globalConfig.aimbot);
+    if (enabled !== undefined) userConfig.aimbot.enabled = enabled;
+    if (showfov !== undefined) userConfig.aimbot.showfov = showfov;
+    if (fov !== undefined) userConfig.aimbot.fov = fov;
+    if (norcl !== undefined) userConfig.aimbot.norcl = norcl;
+    
+    console.log(`[API] Aimbot atualizado para ${user}:`, userConfig.aimbot);
     res.json({
         success: true,
         message: 'Configurações de aimbot atualizadas',
-        config: globalConfig.aimbot
+        config: userConfig.aimbot,
+        username: user
     });
 });
 
@@ -222,19 +242,19 @@ app.post('/api/aimbot', (req, res) => {
 // ============================================
 
 app.post('/api/legit/toggle', (req, res) => {
-    const { enabled } = req.body;
-    console.log('[API] Legit toggle:', enabled);
-    globalConfig.aim.controllegit = enabled;
+    const { enabled, username } = req.body;
+    const user = username || req.headers['x-username'];
     
-    broadcastToAll({
-        type: 'legit_toggle',
-        enabled: enabled
-    });
+    console.log(`[API] Legit toggle para ${user}:`, enabled);
+    
+    const userConfig = getUserConfig(user);
+    userConfig.aim.controllegit = enabled;
     
     res.json({
         success: true,
         message: `Legit Aimbot ${enabled ? 'ativado' : 'desativado'}`,
-        enabled: enabled
+        enabled: enabled,
+        username: user
     });
 });
 
@@ -251,19 +271,19 @@ app.post('/api/legit/inject', (req, res) => {
 });
 
 app.post('/api/rage/toggle', (req, res) => {
-    const { enabled } = req.body;
-    console.log('[API] Rage toggle:', enabled);
-    globalConfig.aim.controlrage = enabled;
+    const { enabled, username } = req.body;
+    const user = username || req.headers['x-username'];
     
-    broadcastToAll({
-        type: 'rage_toggle',
-        enabled: enabled
-    });
+    console.log(`[API] Rage toggle para ${user}:`, enabled);
+    
+    const userConfig = getUserConfig(user);
+    userConfig.aim.controlrage = enabled;
     
     res.json({
         success: true,
         message: `Rage Aimbot ${enabled ? 'ativado' : 'desativado'}`,
-        enabled: enabled
+        enabled: enabled,
+        username: user
     });
 });
 
@@ -283,42 +303,36 @@ app.post('/api/rage/inject', (req, res) => {
 // ============================================
 
 app.post('/api/legitkeybind', (req, res) => {
-    const { enabled, keybind, keybindmode } = req.body;
+    const { enabled, keybind, keybindmode, username } = req.body;
+    const user = username || req.headers['x-username'];
     
-    globalConfig.legitkeybind.enabled = enabled;
-    globalConfig.legitkeybind.keybind = keybind;
-    globalConfig.legitkeybind.keybindmode = keybindmode;
-    
-    broadcastToAll({
-        type: 'config_update',
-        category: 'legitkeybind',
-        config: globalConfig.legitkeybind
-    });
+    const userConfig = getUserConfig(user);
+    userConfig.legitkeybind.enabled = enabled;
+    userConfig.legitkeybind.keybind = keybind;
+    userConfig.legitkeybind.keybindmode = keybindmode;
     
     res.json({
         success: true,
         message: 'Keybind Legit configurada',
-        config: globalConfig.legitkeybind
+        config: userConfig.legitkeybind,
+        username: user
     });
 });
 
 app.post('/api/ragekeybind', (req, res) => {
-    const { enabled, keybind, keybindmode } = req.body;
+    const { enabled, keybind, keybindmode, username } = req.body;
+    const user = username || req.headers['x-username'];
     
-    globalConfig.ragekeybind.enabled = enabled;
-    globalConfig.ragekeybind.keybind = keybind;
-    globalConfig.ragekeybind.keybindmode = keybindmode;
-    
-    broadcastToAll({
-        type: 'config_update',
-        category: 'ragekeybind',
-        config: globalConfig.ragekeybind
-    });
+    const userConfig = getUserConfig(user);
+    userConfig.ragekeybind.enabled = enabled;
+    userConfig.ragekeybind.keybind = keybind;
+    userConfig.ragekeybind.keybindmode = keybindmode;
     
     res.json({
         success: true,
         message: 'Keybind Rage configurada',
-        config: globalConfig.ragekeybind
+        config: userConfig.ragekeybind,
+        username: user
     });
 });
 
@@ -327,35 +341,37 @@ app.post('/api/ragekeybind', (req, res) => {
 // ============================================
 
 app.post('/api/chams/inject', (req, res) => {
-    console.log('[API] Chams inject solicitado');
-    // Alternar o valor para forçar detecção de mudança
-    globalConfig.chams.injected = !globalConfig.chams.injected;
+    const { username } = req.body;
+    const user = username || req.headers['x-username'];
     
-    broadcastToAll({
-        type: 'chams_inject'
-    });
+    console.log(`[API] Chams inject solicitado para ${user}`);
+    
+    const userConfig = getUserConfig(user);
+    // Alternar o valor para forçar detecção de mudança
+    userConfig.chams.injected = !userConfig.chams.injected;
     
     res.json({
         success: true,
         message: 'Comando de injeção Chams enviado',
-        injected: globalConfig.chams.injected
+        injected: userConfig.chams.injected,
+        username: user
     });
 });
 
 app.post('/api/chams/toggle', (req, res) => {
-    const { enabled } = req.body;
-    console.log('[API] Chams toggle:', enabled);
-    globalConfig.chams.enabled = enabled;
+    const { enabled, username } = req.body;
+    const user = username || req.headers['x-username'];
     
-    broadcastToAll({
-        type: 'chams_toggle',
-        enabled: enabled
-    });
+    console.log(`[API] Chams toggle para ${user}:`, enabled);
+    
+    const userConfig = getUserConfig(user);
+    userConfig.chams.enabled = enabled;
     
     res.json({
         success: true,
         message: `Chams ${enabled ? 'ativado' : 'desativado'}`,
-        enabled: enabled
+        enabled: enabled,
+        username: user
     });
 });
 
@@ -378,13 +394,38 @@ app.post('/api/settings', (req, res) => {
 });
 
 app.post('/api/bypass', (req, res) => {
-    broadcastToAll({
-        type: 'bypass_load'
-    });
+    const username = req.body.username || req.headers['x-username'] || 'guest';
+    const config = getUserConfig(username);
+    
+    console.log(`[Bypass] Solicitado por: ${username}`);
+    
+    // Definir flag de bypass (será lido pelo cliente no próximo poll)
+    config.loadBypass = true;
+    
+    // Resetar flag após 2 segundos (para não ficar carregando sempre)
+    setTimeout(() => {
+        config.loadBypass = false;
+    }, 2000);
     
     res.json({
         success: true,
-        message: 'Comando de bypass enviado'
+        message: '🚀 Comando de bypass enviado'
+    });
+});
+
+// Endpoint para fechar o programa
+app.post('/api/close', (req, res) => {
+    const username = req.body.username || req.headers['x-username'] || 'guest';
+    const config = getUserConfig(username);
+    
+    console.log(`[Close] Solicitado por: ${username}`);
+    
+    // Definir flag de fechar programa
+    config.closeProgram = true;
+    
+    res.json({
+        success: true,
+        message: '🚪 Comando para fechar programa enviado'
     });
 });
 
