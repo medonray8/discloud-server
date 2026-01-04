@@ -7,7 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware - CORS configurado para aceitar requisiÃ§Ãµes de qualquer origem
+// Middleware - CORS configurado para aceitar requisições de qualquer origem
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -30,8 +30,8 @@ app.use((req, res, next) => {
 });
 
 // ============================================
-// ARMAZENAMENTO EM MEMÃ“RIA (TemporÃ¡rio)
-// Em produÃ§Ã£o, use MongoDB ou PostgreSQL
+// ARMAZENAMENTO EM MEMÓRIA (Temporário)
+// Em produção, use MongoDB ou PostgreSQL
 // ============================================
 
 const clients = new Map(); // clientId -> { ws, config, lastSeen }
@@ -39,7 +39,7 @@ const commandQueue = new Map(); // clientId -> [comandos]
 const userSessions = new Map(); // username -> { clientId, token }
 
 // ============================================
-// CONFIGURAÃ‡Ã•ES GLOBAIS
+// CONFIGURAÇÕES GLOBAIS
 // ============================================
 
 const globalConfig = {
@@ -70,7 +70,7 @@ const globalConfig = {
 };
 
 // ============================================
-// WEBSOCKET SERVER (ComunicaÃ§Ã£o em Tempo Real)
+// WEBSOCKET SERVER (Comunicação em Tempo Real)
 // ============================================
 
 const wss = new WebSocket.Server({ noServer: true });
@@ -87,7 +87,7 @@ wss.on('connection', (ws, req) => {
         authenticated: false
     });
 
-    // Enviar configuraÃ§Ã£o inicial
+    // Enviar configuração inicial
     ws.send(JSON.stringify({
         type: 'init',
         clientId: clientId,
@@ -135,7 +135,7 @@ function handleClientMessage(clientId, data) {
             break;
             
         case 'config_update':
-            // Cliente reportando configuraÃ§Ã£o atual
+            // Cliente reportando configuração atual
             client.config = data.config;
             break;
             
@@ -177,7 +177,7 @@ app.get('/api/status', (req, res) => {
     });
 });
 
-// Obter configuraÃ§Ã£o atual
+// Obter configuração atual
 app.get('/api/config', (req, res) => {
     res.json({
         success: true,
@@ -212,7 +212,7 @@ app.post('/api/aimbot', (req, res) => {
     console.log('[API] Aimbot atualizado:', globalConfig.aimbot);
     res.json({
         success: true,
-        message: 'ConfiguraÃ§Ãµes de aimbot atualizadas',
+        message: 'Configurações de aimbot atualizadas',
         config: globalConfig.aimbot
     });
 });
@@ -246,7 +246,7 @@ app.post('/api/legit/inject', (req, res) => {
     
     res.json({
         success: true,
-        message: 'Comando de injeÃ§Ã£o Legit enviado'
+        message: 'Comando de injeção Legit enviado'
     });
 });
 
@@ -274,7 +274,7 @@ app.post('/api/rage/inject', (req, res) => {
     
     res.json({
         success: true,
-        message: 'Comando de injeÃ§Ã£o Rage enviado'
+        message: 'Comando de injeção Rage enviado'
     });
 });
 
@@ -328,7 +328,8 @@ app.post('/api/ragekeybind', (req, res) => {
 
 app.post('/api/chams/inject', (req, res) => {
     console.log('[API] Chams inject solicitado');
-    globalConfig.chams.injected = true;
+    // Alternar o valor para forçar detecção de mudança
+    globalConfig.chams.injected = !globalConfig.chams.injected;
     
     broadcastToAll({
         type: 'chams_inject'
@@ -336,7 +337,8 @@ app.post('/api/chams/inject', (req, res) => {
     
     res.json({
         success: true,
-        message: 'Comando de injeÃ§Ã£o Chams enviado'
+        message: 'Comando de injeção Chams enviado',
+        injected: globalConfig.chams.injected
     });
 });
 
@@ -371,7 +373,7 @@ app.post('/api/settings', (req, res) => {
     
     res.json({
         success: true,
-        message: 'ConfiguraÃ§Ãµes atualizadas'
+        message: 'Configurações atualizadas'
     });
 });
 
@@ -406,11 +408,11 @@ app.get('/', (req, res) => {
 
 const server = app.listen(PORT, () => {
     console.log(`
-â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
-â•‘   BXY FREE FIRE API SERVER             â•‘
-â•‘   Porta: ${PORT}                       â•‘
-â•‘   Status: ONLINE                       â•‘
-â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+╔════════════════════════════════════════╗
+║   BXY FREE FIRE API SERVER             ║
+║   Porta: ${PORT}                       ║
+║   Status: ONLINE                       ║
+╚════════════════════════════════════════╝
     `);
 });
 
