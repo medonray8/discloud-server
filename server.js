@@ -7,14 +7,31 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// Middleware - CORS configurado para aceitar requisiÃ§Ãµes de qualquer origem
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false
+}));
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
+// Headers adicionais para CORS
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 // ============================================
-// ARMAZENAMENTO EM MEMÓRIA (Temporário)
-// Em produção, use MongoDB ou PostgreSQL
+// ARMAZENAMENTO EM MEMÃ“RIA (TemporÃ¡rio)
+// Em produÃ§Ã£o, use MongoDB ou PostgreSQL
 // ============================================
 
 const clients = new Map(); // clientId -> { ws, config, lastSeen }
@@ -22,7 +39,7 @@ const commandQueue = new Map(); // clientId -> [comandos]
 const userSessions = new Map(); // username -> { clientId, token }
 
 // ============================================
-// CONFIGURAÇÕES GLOBAIS
+// CONFIGURAÃ‡Ã•ES GLOBAIS
 // ============================================
 
 const globalConfig = {
@@ -45,11 +62,15 @@ const globalConfig = {
     aim: {
         controllegit: false,
         controlrage: false
+    },
+    chams: {
+        enabled: false,
+        injected: false
     }
 };
 
 // ============================================
-// WEBSOCKET SERVER (Comunicação em Tempo Real)
+// WEBSOCKET SERVER (ComunicaÃ§Ã£o em Tempo Real)
 // ============================================
 
 const wss = new WebSocket.Server({ noServer: true });
@@ -66,7 +87,7 @@ wss.on('connection', (ws, req) => {
         authenticated: false
     });
 
-    // Enviar configuração inicial
+    // Enviar configuraÃ§Ã£o inicial
     ws.send(JSON.stringify({
         type: 'init',
         clientId: clientId,
@@ -114,7 +135,7 @@ function handleClientMessage(clientId, data) {
             break;
             
         case 'config_update':
-            // Cliente reportando configuração atual
+            // Cliente reportando configuraÃ§Ã£o atual
             client.config = data.config;
             break;
             
@@ -146,6 +167,7 @@ function broadcastToAll(message) {
 
 // Status do servidor
 app.get('/api/status', (req, res) => {
+    console.log('[API] Status verificado');
     res.json({
         success: true,
         connected: true,
@@ -155,7 +177,7 @@ app.get('/api/status', (req, res) => {
     });
 });
 
-// Obter configuração atual
+// Obter configuraÃ§Ã£o atual
 app.get('/api/config', (req, res) => {
     res.json({
         success: true,
@@ -174,6 +196,7 @@ app.get('/api/config', (req, res) => {
 
 app.post('/api/aimbot', (req, res) => {
     const { enabled, showfov, fov, norcl } = req.body;
+    console.log('[API] Aimbot config recebida:', req.body);
     
     if (enabled !== undefined) globalConfig.aimbot.enabled = enabled;
     if (showfov !== undefined) globalConfig.aimbot.showfov = showfov;
@@ -186,9 +209,10 @@ app.post('/api/aimbot', (req, res) => {
         config: globalConfig.aimbot
     });
     
+    console.log('[API] Aimbot atualizado:', globalConfig.aimbot);
     res.json({
         success: true,
-        message: 'Configurações de aimbot atualizadas',
+        message: 'ConfiguraÃ§Ãµes de aimbot atualizadas',
         config: globalConfig.aimbot
     });
 });
@@ -199,6 +223,7 @@ app.post('/api/aimbot', (req, res) => {
 
 app.post('/api/legit/toggle', (req, res) => {
     const { enabled } = req.body;
+    console.log('[API] Legit toggle:', enabled);
     globalConfig.aim.controllegit = enabled;
     
     broadcastToAll({
@@ -214,18 +239,20 @@ app.post('/api/legit/toggle', (req, res) => {
 });
 
 app.post('/api/legit/inject', (req, res) => {
+    console.log('[API] Legit inject solicitado');
     broadcastToAll({
         type: 'legit_inject'
     });
     
     res.json({
         success: true,
-        message: 'Comando de injeção Legit enviado'
+        message: 'Comando de injeÃ§Ã£o Legit enviado'
     });
 });
 
 app.post('/api/rage/toggle', (req, res) => {
     const { enabled } = req.body;
+    console.log('[API] Rage toggle:', enabled);
     globalConfig.aim.controlrage = enabled;
     
     broadcastToAll({
@@ -247,7 +274,7 @@ app.post('/api/rage/inject', (req, res) => {
     
     res.json({
         success: true,
-        message: 'Comando de injeção Rage enviado'
+        message: 'Comando de injeÃ§Ã£o Rage enviado'
     });
 });
 
@@ -300,18 +327,23 @@ app.post('/api/ragekeybind', (req, res) => {
 // ============================================
 
 app.post('/api/chams/inject', (req, res) => {
+    console.log('[API] Chams inject solicitado');
+    globalConfig.chams.injected = true;
+    
     broadcastToAll({
         type: 'chams_inject'
     });
     
     res.json({
         success: true,
-        message: 'Comando de injeção Chams enviado'
+        message: 'Comando de injeÃ§Ã£o Chams enviado'
     });
 });
 
 app.post('/api/chams/toggle', (req, res) => {
     const { enabled } = req.body;
+    console.log('[API] Chams toggle:', enabled);
+    globalConfig.chams.enabled = enabled;
     
     broadcastToAll({
         type: 'chams_toggle',
@@ -320,6 +352,10 @@ app.post('/api/chams/toggle', (req, res) => {
     
     res.json({
         success: true,
+        message: `Chams ${enabled ? 'ativado' : 'desativado'}`,
+        enabled: enabled
+    });
+});
         message: `Chams ${enabled ? 'ativado' : 'desativado'}`,
         enabled: enabled
     });
@@ -339,7 +375,7 @@ app.post('/api/settings', (req, res) => {
     
     res.json({
         success: true,
-        message: 'Configurações atualizadas'
+        message: 'ConfiguraÃ§Ãµes atualizadas'
     });
 });
 
@@ -374,11 +410,11 @@ app.get('/', (req, res) => {
 
 const server = app.listen(PORT, () => {
     console.log(`
-╔════════════════════════════════════════╗
-║   BXY FREE FIRE API SERVER             ║
-║   Porta: ${PORT}                       ║
-║   Status: ONLINE                       ║
-╚════════════════════════════════════════╝
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘   BXY FREE FIRE API SERVER             â•‘
+â•‘   Porta: ${PORT}                       â•‘
+â•‘   Status: ONLINE                       â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     `);
 });
 
