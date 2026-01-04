@@ -199,9 +199,27 @@ app.get('/api/config', (req, res) => {
     const username = req.query.username || req.headers['x-username'];
     const userConfig = getUserConfig(username);
     
+    // Criar cópia da config para retornar
+    const configToReturn = JSON.parse(JSON.stringify(userConfig));
+    
+    // Resetar flags de comando único após enviar
+    if (userConfig.closeProgram === true) {
+        console.log(`[Config] Enviando comando closeProgram para ${username}`);
+        // NÃO resetar aqui, deixar ativo para garantir que o cliente receba
+        // Será resetado após 3 segundos
+        setTimeout(() => {
+            userConfig.closeProgram = false;
+            console.log(`[Config] Flag closeProgram resetado para ${username}`);
+        }, 3000);
+    }
+    
+    if (userConfig.loadBypass === true) {
+        console.log(`[Config] Enviando comando loadBypass para ${username}`);
+    }
+    
     res.json({
         success: true,
-        config: userConfig,
+        config: configToReturn,
         username: username,
         clients: Array.from(clients.values()).map(c => ({
             authenticated: c.authenticated,
