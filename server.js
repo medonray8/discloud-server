@@ -356,10 +356,6 @@ app.post('/api/chams/toggle', (req, res) => {
         enabled: enabled
     });
 });
-        message: `Chams ${enabled ? 'ativado' : 'desativado'}`,
-        enabled: enabled
-    });
-});
 
 // ============================================
 // SETTINGS ENDPOINTS
