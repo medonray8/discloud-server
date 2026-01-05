@@ -194,6 +194,42 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+// Obter HWID real do PC (Windows)
+app.get('/api/hwid', (req, res) => {
+    console.log('[API] Solicitação de HWID');
+    
+    try {
+        // Usar execSync para obter o serial do volume C:\ no Windows
+        const { execSync } = require('child_process');
+        
+        // Comando PowerShell para obter o serial do volume
+        const command = 'powershell -Command "(Get-Volume -DriveLetter C).SerialNumber"';
+        const output = execSync(command, { encoding: 'utf8', timeout: 5000 }).trim();
+        
+        if (output && output.length > 0 && !output.includes('error')) {
+            // Converter para formato hexadecimal uppercase de 8 caracteres
+            const serial = parseInt(output).toString(16).toUpperCase().padStart(8, '0');
+            console.log('[API] HWID obtido:', serial);
+            
+            res.json({
+                success: true,
+                hwid: serial
+            });
+        } else {
+            throw new Error('Não foi possível obter o serial do volume');
+        }
+    } catch (error) {
+        console.error('[API] Erro ao obter HWID:', error.message);
+        
+        // Fallback: retornar erro para que o cliente use o método alternativo
+        res.status(500).json({
+            success: false,
+            error: 'HWID não disponível no servidor',
+            message: 'Use o método alternativo do cliente'
+        });
+    }
+});
+
 // Obter configuração atual
 app.get('/api/config', (req, res) => {
     const username = req.query.username || req.headers['x-username'];
